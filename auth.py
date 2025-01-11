@@ -5,6 +5,7 @@ from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
 from db import users
 
+# mock
 SECRET_KEY = "6ed033ff2edc3d16009c10e98848bb1e947c57b66b7868ec3f84f15691481fe1"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
