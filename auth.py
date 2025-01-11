@@ -3,9 +3,9 @@ import bcrypt
 from datetime import timedelta, datetime, timezone
 from fastapi import HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
-from db import users
+from db import *
+from sqlmodel import *
 
-# mock
 SECRET_KEY = "6ed033ff2edc3d16009c10e98848bb1e947c57b66b7868ec3f84f15691481fe1"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -16,7 +16,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     bytes = plain_password.encode("utf-8")
     hashed_bytes = hashed_password.encode("utf-8")
     return bcrypt.checkpw(bytes, hashed_bytes)
-
 
 def create_access_token(data: dict):
     payload = data.copy()
@@ -39,21 +38,22 @@ def decode_access_token(token: str):
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
     
-def get_current_user(token: str = Depends(oauth2_scheme)):
+def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)):
     decoded_token = decode_access_token(token)
-    username = decoded_token.get("sub")  # Extract the "sub" claim
+    username = decoded_token.get("sub")
 
-    for user in users.values():
-        if user["username"] == username:
-            return user
+    q = select(User).where(username == User.username)
+    stored_user = session.exec(q).first()
+    if not stored_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    return stored_user
 
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid authentication credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-def is_admin(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "admin":
+def is_admin(current_user: User = Depends(get_current_user)):
+    if current_user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You do not have permission to perform this action")
     return True
